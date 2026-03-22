@@ -7,7 +7,7 @@
 > Dado un procesador al que se le pueda cambiar la frecuencia, ejecutamos un código que demore alrededor de 10 segundos.
 > ¿Qué sucede con el tiempo del programa al duplicar (variar) la frecuencia ? 
 
-...
+Al variar la frecuencia del procesador el tiempo de ejecución del programa cambia de manera inversamente proporcional. Al duplicar la frecuencia, el programa que originalmente tardaba alrededor de 10 segundos pasa a ejecutarse en aproximadamente 5 segundos. Esto permite concluir que, para un mismo programa y bajo las mismas condiciones de ejecución, el tiempo de ejecución depende directamente de la cantidad de ciclos necesarios para ejecutar las instrucciones e inversamente de la frecuencia del procesador.
 
 ---
 
@@ -16,30 +16,68 @@
 > Armar una lista de benchmarks
 > ¿Cuales les serían más útiles a cada uno?
 > ¿Cuáles podrían llegar a medir mejor las tareas que ustedes realizan a diario?
-
-...
-
 > Pensar en las tareas que cada uno realiza a diario y escribir en una tabla de dos entradas las tareas y que benchmark la representa mejor.
 
-|Tarea|Benchmark|
-|---|---|
-|1|1|
-|2|2|
-|3|3|
-|4|4|
-|5|5|
+| Tarea                         | Benchmark                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| Generación de código con Claude Code | Latencia de red (ms), ancho de banda de red (Mbps), tiempo de respuesta de API        |
+| Ejecución de tests                   | Tiempo de ejecución de procesos, CPU time, benchmark de CPU multi-core                |
+| Ejecuciones de pipelines CI/CD       | CPU multi-core performance, Disk I/O throughput (MB/s), Disk IOPS, Network throughput |
+| Pruebas manuales con Postman         | Latencia de red (RTT), tiempo de respuesta del servidor, requests por segundo         |
+| Búsquedas en bases de datos          | Disk IOPS, Disk latency, Memory latency, tiempo de ejecución de queries               |
+| Streaming de películas               | Network throughput sostenido (Mbps), buffering rate, packet loss                      |
+| Online gaming                        | Network latency (ping), jitter, packet loss, FPS                                      |
+| Descargas de archivos                | Network throughput (Mbps), Disk write throughput (MB/s)                               |
 
 > ¿Cual es el rendimiento de estos procesadores para compilar el kernel?
 > Intel Core i5-13600K (base)
 > AMD Ryzen 9 5900X 12-Core
 
-...
+El Intel Core i5-13600K demora 83 segundos en compilar el kernel, mientras que el AMD Ryzen 9 5900X 12-Core demora 97 segundos. Podemos entonces determinar que el procesador Intel tiene un rendimiento de 0.0120 compilaciones/s, mientras que el AMD tiene un rendimiento de 0.0103 compilaciones/s. Esto es una diferencia de alrededor 17% en favor del procesador Intel.
+
+Pordemos ver esto expresado en la siguiente tabla:
+
+| CPU           | Speedup      |
+| ------------- | ------------ |
+| i5-13600K     | 1            |
+| Ryzen 9 5900X | 83/97 = 0.86 |
+
+La compilación del kernel es una tarea parcialmente paralelizable. Durante la compilación, muchos archivos pueden compilarse en paralelo, lo que aprovecha múltiples núcleos del procesador. Sin embargo, existen etapas del proceso que deben ejecutarse de forma secuencial, como el linking final y algunas dependencias entre archivos. Debido a esto, el tiempo total de compilación depende tanto del rendimiento multi-core como del rendimiento single-core.
+
+El Intel Core i5-13600K posee mayor frecuencia de reloj y mejor rendimiento por núcleo, lo que mejora las partes secuenciales del proceso. Por esta razón, a pesar de tener menos threads que el Ryzen 9 5900X, logra un menor tiempo total de compilación del kernel.
 
 > ¿Cual es la aceleración cuando usamos un AMD Ryzen 9 7950X 16-Core?
 > ¿Cual de ellos hace un uso más eficiente de la cantidad de núcleos que tiene?
 > ¿Cuál es más eficiente en términos de costo (dinero y energía)?
 
-...
+El procesador AMD Ryzen 9 7950X 16-Core es ~1.6 veces más rápido que el i5-13600Ky ~1.87 veces más rápido que el Ryzen 9 5900X compilando el kernel.
+
+En terminos del uso eficiente de sus nucleos, se obtuvieron los siguientes resultados:
+
+| CPU           | Speedup      |
+| ------------- | ------------ |
+| i5-13600K     | 1            |
+| Ryzen 9 5900X | 83/97 = 0.86 |
+| Ryzen 9 7950X | 83/52 = 1.60 |
+
+| CPU           | Speedup | Núcleos | Eficiencia |
+| ------------- | ------- | ------- | ---------- |
+| i5-13600K     | 1       | 14      | 0.071      |
+| Ryzen 9 5900X | 0.86    | 12      | 0.072      |
+| Ryzen 9 7950X | 1.60    | 16      | 0.100      |
+
+Tomando como base el Intel Core i5-13600K, se calcula el speedup para los demás procesadores como la relación entre los tiempos de ejecución. El Ryzen 9 5900X presenta un speedup de 0.86, por lo que resulta más lento que el procesador base, mientras que el Ryzen 9 7950X presenta un speedup de 1.60, siendo aproximadamente un 60% más rápido.
+
+La eficiencia se calcula como Speedup/n, donde n es la cantidad de núcleos. Al calcular la eficiencia para cada procesador, se observa que el Ryzen 9 7950X presenta la mayor eficiencia, lo que indica que es el procesador que mejor aprovecha la cantidad de núcleos en la compilación del kernel. Esto se debe a que la tarea es paralelizable pero no completamente, por lo que la eficiencia está limitada por las partes secuenciales del proceso.
+
+En términos de rendimiento absoluto, el Ryzen 9 7950X es el más rápido para la compilación del kernel. Sin embargo, al analizar la eficiencia en términos de costo, se debe considerar el rendimiento por unidad de dinero y por consumo energético. El Ryzen 9 7950X posee el mayor rendimiento pero también el mayor costo y consumo energético. El Intel Core i5-13600K presenta un rendimiento cercano pero con menor costo, por lo que ofrece la mejor relación precio/rendimiento. Por otro lado, el Ryzen 9 5900X presenta menor rendimiento pero también menor consumo energético, por lo que puede considerarse eficiente en términos de rendimiento por watt. Por lo tanto, el procesador más eficiente depende del criterio: el 7950X en rendimiento absoluto, el i5-13600K en precio/rendimiento y el 5900X en eficiencia energética.
+
+| CPU           | Rendimiento | Precio | Consumo | Eficiencia                 |
+| ------------- | ----------- | ------ | ------- | -------------------------- |
+| i5-13600K     | Alto        | Medio  | Medio   | Mejor precio/rendimiento   |
+| Ryzen 9 5900X | Medio       | Medio  | Bajo    | Mejor rendimiento/W        |
+| Ryzen 9 7950X | Muy alto    | Alto   | Alto    | Mejor rendimiento absoluto |
+
 
 ---
 
