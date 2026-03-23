@@ -5,9 +5,31 @@
 ### Relacion Tiempo y Frecuencia
 
 > Dado un procesador al que se le pueda cambiar la frecuencia, ejecutamos un código que demore alrededor de 10 segundos.
-> ¿Qué sucede con el tiempo del programa al duplicar (variar) la frecuencia ? 
+> ¿Qué sucede con el tiempo del programa al duplicar (variar) la frecuencia ?
 
-Al variar la frecuencia del procesador el tiempo de ejecución del programa cambia de manera inversamente proporcional. Al duplicar la frecuencia, el programa que originalmente tardaba alrededor de 10 segundos pasa a ejecutarse en aproximadamente 5 segundos. Esto permite concluir que, para un mismo programa y bajo las mismas condiciones de ejecución, el tiempo de ejecución depende directamente de la cantidad de ciclos necesarios para ejecutar las instrucciones e inversamente de la frecuencia del procesador.
+Para realizar esta experiencia se construyo un pequeño codigo que ejecuta una cantidad predeterminada de instrucciones "nop" ("no operation"), las cuales son instrucciones para la CPU que hacen nada mas que consumir un ciclo (o varios) de reloj. Son usualmente usadas para benchmarking. Se determino el numero de instrucciones a base de prueba y error para que demore precisamente diez segundos la ejecucion al setear el clock a 8 MHz.
+
+```c
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+
+  uint32_t start = ESP.getCycleCount();
+
+  for (uint32_t i = 0; i < 30410000; i++) {
+    asm volatile ("nop");
+  }
+
+  uint32_t end = ESP.getCycleCount();
+
+  uint32_t cycles = end - start;
+  float seconds = (float)cycles / (getCpuFrequencyMhz() * 1000000.0);
+
+  Serial.println(seconds);
+}
+```
+
+Al duplicar la frecuencia del CPU, el tiempo de ejecución no se redujo exactamente a la mitad debido a que no todo el tiempo de ejecución depende de la velocidad del procesador, solo paso de 10s a 5.34s. Existe una fracción del tiempo correspondiente a overhead del sistema, temporizadores, simulador y otras operaciones que no escalan con la frecuencia. Por lo tanto, el tiempo total puede modelarse como T = A/f + B. Este comportamiento coincide con la Ley de Amdahl, donde la parte no acelerable limita el speedup máximo del sistema.
 
 ---
 
