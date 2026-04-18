@@ -266,13 +266,19 @@ gini_convert:
 
 Se utiliza el registro `xmm0` para pasar el argumento float siguiendo la convencion de llamadas definida en la ABI:
 
-> SSE The class consists of types that fit into a vector register.
-> Arguments of types float, double, _Decimal32, _Decimal64 and __m64 are in class SSE.
-> If the class is SSE, the next available vector register is used, the registers are taken in the order from %xmm0 to %xmm7.
+> SSE The class consists of types that fit into a vector register.  
+> Arguments of types float, double, _Decimal32, _Decimal64 and __m64 are in class SSE.  
+> If the class is SSE, the next available vector register is used, the registers are taken in the order from %xmm0 to %xmm7.  
 
 #### C
 
-...
+El cambio respecto a la Iteracion #1 es que reemplazamos la implementacion propia por una declaracion extern que apunta a la rutina asm.
+
+```C
+#include <stdio.h>
+
+extern int gini_convert(float gini_value);
+```
 
 ---
 
