@@ -226,7 +226,9 @@ Año    GINI (float)     GINI (int) + 1
 
 ### Iteracion #2
 
-...
+La unica capa que cambia respecto a la Iteracon #1 es la capa C, en lugar de hacer la conversion ella misma, declara un prototipo extern y delega la operacion a la rutina NASM `gini_convert`. 
+
+Python no se modifica en absoluto, la interfaz de la `.so` permanece idéntica.
 
 #### Assembler
 
