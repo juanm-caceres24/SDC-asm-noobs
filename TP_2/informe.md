@@ -328,25 +328,16 @@ Año    GINI (float)     GINI (int) + 1
 2019   43.30            44
 2020   42.70            43
 ```
----
-
-### Call Conventions
-
-...
-
-#### Registros
-
-...
-
-#### Stack Frame
-
-...
 
 ---
 
 ### GDB Analisis
 
-...
+A continuacion implementamos en C puro el recuperado de los datos mediante rest y el llamado a la funcion `gini_convert`.
+
+Con esta version del programa, utilizamos GDB-Dashboard para analizar el estado del stack y los registros durante el ciclo de vida de la ejecucion del programa.
+
+Nos centramos en como cambian los valores de los registros y del stack alrededor de la llamada a la subrutina de `gini_calc.c`
 
 #### Configuración
 
@@ -355,17 +346,21 @@ Para la configuración de GDB-Dashboard ejecutamos los siguientes comandos:
 ```bash
 git clone https://github.com/cyrus-and/gdb-dashboard.git ~/gdb-dashboard
 ```
+
 Comprobamos que exista el archivo `.gdbinit`
 
 ```bash
 ls ~/gdb-dashboard/.gdbinit
 ```
+
 Compilamos el programa puro en lenguaje C utilizando `Makefile` (el cual ya tiene el flag `-g3`), generando el ejecutable `gini_api_c`.
 
 Ejecutamos con `gdb`:
+
 ```bash
 gdb ./gini_api_c
 ```
+
 Para poder ver el dashboard iniciamos con `start`.
 
 Para tener una mejor visualización acomodamos el `layout`.
@@ -373,7 +368,9 @@ Para tener una mejor visualización acomodamos el `layout`.
 ```bash
 >>> dashboard -layout source breakpoints stack assembly registers  
 ```
+
 Fijamos un breakpoint en la linea 104, le damos continuación y empezamos a ver instrucción por instrucción en el bloque de assembly con `stepi`.
+
 ```bash
 >>> br 104
 >>> c
@@ -382,28 +379,35 @@ Fijamos un breakpoint en la linea 104, le damos continuación y empezamos a ver 
 
 #### Stack antes de `call`
 
-![](img/stack-antes-call.png)
 En el código assembly se puede ver que está a punto de hacer el `call` a `gini_convert`.
+
+![](img/stack-antes-call.png)
 
 #### Stack durante `call`
 
-![](img/stack-durante-call.png)
 Inmediatemente despues del `call` se apila un nuevo frame.
 
+![](img/stack-durante-call.png)
+
 #### Durante `gini_convert`
+
 El valor `float`se guarda en el registro `rax`.
+
 ![](img/antes-truncamiento.png)
 
 Luego, se puede ver como con `cvttss2si` se produce el truncamiento en `rax`, pasando de `float` a `int`
+
 ![](img/despues-truncamiento.png)
 
 Y finalmente se le suma 1.
+
 ![](img/despues-add1.png)
 
 #### Stack despues de `call`
 
-![](img/stack-despues-call.png)
 Al salir de `gini_convert` se desapila el frame del stack.
+
+![](img/stack-despues-call.png)
 
 ---
 
@@ -427,6 +431,8 @@ Al salir de `gini_convert` se desapila el frame del stack.
 
 ### Referencias
 
+[] - [World Bank API](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589-developer-information)
+
 [] - [System V Application Binary Interface - AMD64 Architecture Processor Supplement - Draft Version 0.99.6](https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf)
 
-[] - ref_two_ex
+[] - [GDB-Dashboard](https://github.com/cyrus-and/gdb-dashboard)
