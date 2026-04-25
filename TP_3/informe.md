@@ -1,6 +1,6 @@
 # Trabajo Practico N°3
 
-## Calculadora de Indices
+## Modo Protegido
 
 **Materia:** Sistemas de Computacion  
 **Grupo:** asm_noobs  
