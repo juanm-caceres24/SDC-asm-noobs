@@ -165,12 +165,6 @@ Finalmente tiene mas vida util del hardware añadiendo soporte para nuevas funci
 
 ---
 
-### Depuracion con GDB + QEMU
-
-...
-
----
-
 ### Referencias
 
 > ...
