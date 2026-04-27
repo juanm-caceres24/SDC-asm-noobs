@@ -293,13 +293,16 @@ En este caso es imposible que un error en el puntero de datos sobrescriba el có
 intentar escribir, ¿Que sucede? ¿Que debería suceder a continuación? (revisar el
 teórico) Verificarlo con gdb.
 
-Ejecuciones para usar el protected_mode con gbd:
+En la linea 40 de `protected_mode.S` el acceso de datos esta en en read/write. Para pasarlo a `only_read` cambiamos .byte 0x92 por .byte 0x90.
+Ademas, incluimos una escritura antes de que la ejecucion entre en el bucle infinito.
 
-Compilar protected_mode.S:
-  > as -g -o protected_mode.o protected_mode.S
+Ejecuciones para usar el protected_mode_OR.S con gbd:
+
+Compilar protected_mode_OR.S:
+  > as -g -o protected_mode_OR.o protected_mode_OR.S
 
 Linkear y generar imagen booteable:
-  > ld --oformat binary -o main.img -T link.ld protected_mode.o
+  > ld --oformat binary -o main.img -T link.ld protected_mode_OR.o
 
 Iniciar con qemu:
   > qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio
@@ -318,6 +321,9 @@ Poner un breakpoints:
  > br *0x7c19 (antes del salto)
 
  > br *0x7c3e (protected_mode_entry)
+
+ > br *0x07c51 (antes del error)
+
 
 Mejor vista:
  > dashboard -layout breakpoints stack assembly
