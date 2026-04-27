@@ -386,10 +386,152 @@ Para pasar a modo protegido debemos realizar lo siguiente:
 Esto lo podemos realizar con el siguiente codigo:
 
 ```NASM
+.code16
+.global _start
+
+_start:
+    cli                     # deshabilitar interrupciones
+
+    xor %ax, %ax
+    mov %ax, %ds
+    mov %ax, %ss
+    mov $0x7C00, %sp
+
+    # cargar GDT
+    lgdt gdt_descriptor
+
+    # activar modo protegido (CR0.PE = 1)
+    mov %cr0, %eax
+    or $0x1, %eax
+    mov %eax, %cr0
+
+    # salto lejano para limpiar pipeline
+    ljmp $0x08, $protected_mode_entry
+
+# GDT 
+.align 8
+gdt_start:
+    .quad 0x0000000000000000     # descriptor nulo
+
+    # descriptor código: base=0x00
+    .word 0xFFFF                 # limit low
+    .word 0x0000                 # base low
+    .byte 0x00                   # base mid
+    .byte 0x9A                   # access: code, exec/read
+    .byte 0xCF                   # flags + limit high
+    .byte 0x00                   # base high
+
+    # descriptor datos: base=0x00
+    .word 0xFFFF
+    .word 0x0000
+    .byte 0x00
+    .byte 0x92                   # access: data, read/write
+    .byte 0xCF
+    .byte 0x00
+
+gdt_end:
+
+gdt_descriptor:
+    .word gdt_end - gdt_start - 1
+    .long gdt_start
+
+
+
+# Modo protegido
+.code32
+protected_mode_entry:
+
+    # cargar selectores
+    mov $0x10, %ax       # selector de datos (2do descriptor)
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
+
+    # stack en modo protegido
+    mov $0x90000, %ebp   # que no este cerca del Bootloader
+    mov %ebp, %esp
+    
+loop:                    # Bucle infinito
+    jmp loop
+
+# Aclaracion, la firma 0xAA55 y el corrimiento de arranque [ORG 0x7C00] ya estarian en el link.ld, no hace falta repetir incluso hacer dos corrimientos podria redireccionar a una seccion de memoria incorrecta.
 
 ```
 
 ---
+
+> ¿Cómo sería un programa que tenga dos descriptores de memoria diferentes, uno para cada segmento (código y datos) en espacios de memoria diferenciados?
+
+La configuracion de los descriptores seria de la siguiente forma:
+```NASM
+.align 8
+gdt_start:
+    .quad 0x0000000000000000   # null
+
+    # descriptor código: base=0x00
+
+    .word 0xFFFF               # limit low
+    .word 0x0000               # base low
+    .byte 0x00                 # base mid (bits 0-15)
+    .byte 0x9A                 # access: code, exec/read
+    .byte 0xCF                 # flags + limit high
+    .byte 0x00                 # base high
+
+    # descriptor datos: base=0x10
+
+    .word 0xFFFF               
+    .word 0x0000              
+    .byte 0x10                 # base mid (bits 16-23)
+    .byte 0x92                 # access: data, read/write
+    .byte 0xCF                 
+    .byte 0x00                 
+
+gdt_end:
+```
+En este caso es imposible que un error en el puntero de datos sobrescriba el código, porque el límite del segmento de datos no llega físicamente a las direcciones del código.
+
+--- 
+
+> Cambiar los bits de acceso del segmento de datos para que sea de solo lectura,
+intentar escribir, ¿Que sucede? ¿Que debería suceder a continuación? (revisar el
+teórico) Verificarlo con gdb.
+
+En la linea 40 de `protected_mode.S` el acceso de datos esta en en read/write. Para pasarlo a `only_read` cambiamos .byte 0x92 por .byte 0x90.
+Ademas, incluimos una escritura antes de que la ejecucion entre en el bucle infinito.
+
+Ejecuciones para usar el protected_mode_OR.S con gbd:
+
+Compilar protected_mode_OR.S:
+  > as -g -o protected_mode_OR.o protected_mode_OR.S
+
+Linkear y generar imagen booteable:
+  > ld --oformat binary -o main.img -T link.ld protected_mode_OR.o
+
+Iniciar con qemu:
+  > qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio
+
+El flag `-s` abre un servidor GDB en puerto 1234.
+
+En otra terminal ejecutar gdb:
+  > gdb
+
+Dentro de gdb conectarse al puerto 1234:
+  > target remote localhost:1234
+
+Poner un breakpoints:
+ > br *0x7c00
+
+ > br *0x7c19 (antes del salto)
+
+ > br *0x7c3e (protected_mode_entry)
+
+ > br *0x07c51 (antes del error)
+
+
+Mejor vista:
+ > dashboard -layout breakpoints stack assembly
 
 ### Referencias
 
