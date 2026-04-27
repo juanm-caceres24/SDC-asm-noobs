@@ -184,12 +184,13 @@ La opción `--oformat binary` elimina toda esa estructura extra y deja únicamen
 La comparación de estos comandos nos permite contrastar la vista lógica de nuestro programa con la ubicación física final de sus bytes dentro del disco booteable generado por el linker:
 
 * **objdump -d main.o (Panel izquierdo):** Nos muestra el desensamblado del archivo objeto, relacionando las instrucciones lógicas con su código máquina (opcodes). Por ejemplo, en la columna central podemos verificar que la instrucción `int $0x10` (encargada de imprimir en video) se traduce a los bytes `cd 10`, y que la detención del procesador mediante `hlt` corresponde al byte `f4`. Debajo, observamos el inicio de nuestra cadena de texto en la etiqueta `<msg>`.
+  
 * **hd main.img (Panel derecho):** Nos muestra el volcado hexadecimal estructurado del archivo binario plano final (`.img`). En esta vista física podemos comprobar el trabajo del linker en tres puntos críticos:
     1.  **Ubicación del código:** Buscando en el volcado, encontramos nuestros opcodes y la cadena de texto `"hello from asm_noobs"` incrustados correctamente en el binario (visibles a la derecha entre los offsets `00000070` y `00000090`).
     2.  **Relleno (Padding):** El linker calculó el espacio sobrante de nuestro código y lo rellenó automáticamente con ceros (`00`) para alcanzar el tamaño exacto de un sector de disco.
     3.  **Firma de arranque:** En la última línea del sector, correspondiente al offset `000001f0`, verificamos que los últimos dos bytes son exactamente `55 aa`. Esta es la firma mágica obligatoria que debe ubicarse en los bytes 511 y 512 para que la BIOS reconozca al dispositivo como booteable.
 
-![Comparación en terminal de los opcodes lógicos (objdump) y la estructura física del binario booteable (hd)](Screenshot_20260427_114945.png)
+<img width="1366" height="768" alt="WhatsApp Image 2026-04-27 at 11 57 20" src="https://github.com/user-attachments/assets/bf8c9a66-a740-441d-a67f-2ce8503e0bf3" />
 
 #### Generacion y Execucion de Imagen
 
