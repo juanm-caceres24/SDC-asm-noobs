@@ -385,28 +385,25 @@ Para pasar a modo protegido debemos realizar lo siguiente:
 
 Esto lo podemos realizar con el siguiente codigo:
 
-```NASM
+```S
 .code16
 .global _start
 
 _start:
-    cli                     # deshabilitar interrupciones
+    cli                                 # deshabilitar interrupciones
 
-    xor %ax, %ax
+    xor %ax, %ax                        # inicializamos los segmentos
     mov %ax, %ds
     mov %ax, %ss
     mov $0x7C00, %sp
 
-    # cargar GDT
-    lgdt gdt_descriptor
+    lgdt gdt_descriptor                 # cargar GDT
 
-    # activar modo protegido (CR0.PE = 1)
-    mov %cr0, %eax
+    mov %cr0, %eax                      # activar modo protegido (CR0.PE = 1)
     or $0x1, %eax
     mov %eax, %cr0
-
-    # salto lejano para limpiar pipeline
-    ljmp $0x08, $protected_mode_entry
+    
+    ljmp $0x08, $protected_mode_entry   # salto lejano para limpiar pipeline
 
 # GDT 
 .align 8
@@ -435,8 +432,6 @@ gdt_descriptor:
     .word gdt_end - gdt_start - 1
     .long gdt_start
 
-
-
 # Modo protegido
 .code32
 protected_mode_entry:
@@ -455,17 +450,33 @@ protected_mode_entry:
     
 loop:                    # Bucle infinito
     jmp loop
-
-# Aclaracion, la firma 0xAA55 y el corrimiento de arranque [ORG 0x7C00] ya estarian en el link.ld, no hace falta repetir incluso hacer dos corrimientos podria redireccionar a una seccion de memoria incorrecta.
-
 ```
 
----
+> [!NOTE]
+> Aclaracion, la firma 0xAA55 y el corrimiento de arranque [ORG 0x7C00] ya estarian en el link.ld, no hace falta repetir incluso hacer dos corrimientos podria redireccionar a una seccion de memoria incorrecta.
+
+Podemos utilizar QEMU para verificar la transicion correcta hacia el modo protegido. Para esto realizamos:
+
+- Compilamos: `as -g -o protected_mode.o protected_mode.S`
+- Linkear y generamos la imagen: `ld --oformat binary -o main.img -T link.ld protected_mode_OR.o`
+- Iniciamos con qemu: `qemu-system-i386 -fda main.img -boot a -monitor stdio`
+
+> [!NOTE]
+> Para simplificar el proceso de ejecucion esta disponible un makefile que realiza estas acciones.
+
+De esta forma inicializamos QEMU con un monitor en nuestra terminal, lo que nos permite ejecutar `info registers` y verificar que el valor de `CRO` en `00000011`:
+
+IMAGENNNNNNNNNNNNNNNNNNNNNNNNNN
+
+#### Marco Teorico
 
 > ¿Cómo sería un programa que tenga dos descriptores de memoria diferentes, uno para cada segmento (código y datos) en espacios de memoria diferenciados?
 
+En este caso es imposible que un error en el puntero de datos sobrescriba el código, porque el límite del segmento de datos no llega físicamente a las direcciones del código.
+
 La configuracion de los descriptores seria de la siguiente forma:
-```NASM
+
+```S
 .align 8
 gdt_start:
     .quad 0x0000000000000000   # null
@@ -490,48 +501,108 @@ gdt_start:
 
 gdt_end:
 ```
-En este caso es imposible que un error en el puntero de datos sobrescriba el código, porque el límite del segmento de datos no llega físicamente a las direcciones del código.
 
---- 
+> Cambiar los bits de acceso del segmento de datos para que sea de solo lectura, intentar escribir, ¿Que sucede? ¿Que debería suceder a continuación? (revisar el teórico) Verificarlo con gdb.
 
-> Cambiar los bits de acceso del segmento de datos para que sea de solo lectura,
-intentar escribir, ¿Que sucede? ¿Que debería suceder a continuación? (revisar el
-teórico) Verificarlo con gdb.
-
-En la linea 40 de `protected_mode.S` el acceso de datos esta en en read/write. Para pasarlo a `only_read` cambiamos .byte 0x92 por .byte 0x90.
+En la linea 40 de `protected_mode.S` el acceso de datos esta en en read/write. 
+Para pasarlo a `only_read` cambiamos .byte 0x92 por .byte 0x90.
 Ademas, incluimos una escritura antes de que la ejecucion entre en el bucle infinito.
 
-Ejecuciones para usar el protected_mode_OR.S con gbd:
+```S
+.code16
+.global _start
 
-Compilar protected_mode_OR.S:
-  > as -g -o protected_mode_OR.o protected_mode_OR.S
+_start:
+    cli                                 # deshabilitar interrupciones
 
-Linkear y generar imagen booteable:
-  > ld --oformat binary -o main.img -T link.ld protected_mode_OR.o
+    xor %ax, %ax
+    mov %ax, %ds
+    mov %ax, %ss
+    mov $0x7C00, %sp
 
-Iniciar con qemu:
-  > qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio
+    lgdt gdt_descriptor                 # cargar GDT
 
-El flag `-s` abre un servidor GDB en puerto 1234.
+    mov %cr0, %eax                      # activar modo protegido (CR0.PE = 1)
+    or $0x1, %eax
+    mov %eax, %cr0
 
-En otra terminal ejecutar gdb:
-  > gdb
+    ljmp $0x08, $protected_mode_entry   # salto lejano para limpiar pipeline
 
-Dentro de gdb conectarse al puerto 1234:
-  > target remote localhost:1234
+# GDT 
+.align 8
+gdt_start:
+    .quad 0x0000000000000000     # descriptor nulo
 
-Poner un breakpoints:
- > br *0x7c00
+    # descriptor código: base=0x00
+    .word 0xFFFF                 # limit low
+    .word 0x0000                 # base low
+    .byte 0x00                   # base mid
+    .byte 0x9A                   # access: code, exec/read
+    .byte 0xCF                   # flags + limit high
+    .byte 0x00                   # base high
 
- > br *0x7c19 (antes del salto)
+    # descriptor datos: base=0x10
+    .word 0xFFFF
+    .word 0x0000
+    .byte 0x10
+    .byte 0x90                   # access: data, only_read
+    .byte 0xCF
+    .byte 0x00
 
- > br *0x7c3e (protected_mode_entry)
+gdt_end:
 
- > br *0x07c51 (antes del error)
+gdt_descriptor:
+    .word gdt_end - gdt_start - 1
+    .long gdt_start
 
+# Modo protegido
+.code32
+protected_mode_entry:
 
-Mejor vista:
- > dashboard -layout breakpoints stack assembly
+    # cargar selectores
+    mov $0x10, %ax       # selector de datos (2do descriptor)
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
+
+    # stack en modo protegido
+    mov $0x90000, %ebp   # que no este cerca del Bootloader
+    mov %ebp, %esp
+
+    # write en segmento read-only
+    movl $0x12345678, 0x10
+
+loop:                    # Bucle infinito
+    jmp loop
+```
+
+Al ejecutar QEMU observamos un loop infinito de crashes, la pantalla titila infinitamente. 
+Lo que esta ocurriendo es que cuando la ejecución llega a la instrucción de escritura y trata de modificar la memoria usando ese segmento, se desencadena una reacción en cadena fatal:
+- Violación de Protección: La MMU verifica los permisos del segmento en la GDT, ve que es de solo lectura y bloquea la operación de escritura inmediatamente.
+- General Protection Fault: Al detectar la violación, la CPU intenta generar un error llamado General Protection Fault (Excepción #13 o 0x0D).
+- Double Fault: Para procesar esa excepción, la CPU busca una IDT (Interrupt Descriptor Table) que le diga qué código ejecutar para manejar el error. Como no hay la CPU falla de nuevo al intentar manejar el primer fallo, generando un Double Fault.
+- Triple Fault y Reinicio: Como tampoco hay un manejador para el Double Fault, la CPU se rinde. Esto genera un Triple Fault. La respuesta por hardware a un Triple Fault es reiniciar el procesador.
+
+Ejecutamos nuevamente QEMU, ahora con las opciones `-no-reboot -d int` para evitar un loop de crashes infinito y observamos:
+
+IMAGENNNNNNNNNNNNNNNNNNNNNNNNNNN
+
+En la linea `0: v=0d e=0010 i=0 cpl=0 IP=0008:00007c4a pc=00007c4a SP=0000:00007c00 env->regs[R_EAX]=00000010` se produce el error.
+Podemos ver como se regresa hacia modo real en el error, y los valores `v=0d` y `e=0010` indican la excepcion 13 General Protection Fault (GPF) en el descrito 0x10 que es el descriptor de datos.
+
+Esto tambien podemos verificarlo con GDB inicializando un servidor GDB y conectandonos a este para recorrer ciertos breakpoints durante la ejecucion:
+- Iniciar con qemu: `qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio` (El flag `-s` abre un servidor GDB en puerto 1234)
+- En otra terminal ejecutar gdb: `gdb`
+- Dentro de gdb conectarse al puerto 1234: `target remote localhost:1234`
+- Poner un breakpoints:
+  - `br *0x7c00`
+  - `br *0x7c19` (antes del salto)
+  - `br *0x7c3e` (protected_mode_entry)
+  - `br *0x07c51` (antes del error)
+- Para una mejor visualizacion realizamos: `dashboard -layout breakpoints stack assembly`
+
 
 ### Referencias
 

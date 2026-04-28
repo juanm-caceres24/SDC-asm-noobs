@@ -2,23 +2,20 @@
 .global _start
 
 _start:
-    cli                     # deshabilitar interrupciones
+    cli                                 # deshabilitar interrupciones
 
     xor %ax, %ax
     mov %ax, %ds
     mov %ax, %ss
     mov $0x7C00, %sp
 
-    # cargar GDT
-    lgdt gdt_descriptor
+    lgdt gdt_descriptor                 # cargar GDT
 
-    # activar modo protegido (CR0.PE = 1)
-    mov %cr0, %eax
+    mov %cr0, %eax                      # activar modo protegido (CR0.PE = 1)
     or $0x1, %eax
     mov %eax, %cr0
 
-    # salto lejano para limpiar pipeline
-    ljmp $0x08, $protected_mode_entry
+    ljmp $0x08, $protected_mode_entry   # salto lejano para limpiar pipeline
 
 # GDT 
 .align 8
@@ -46,8 +43,6 @@ gdt_end:
 gdt_descriptor:
     .word gdt_end - gdt_start - 1
     .long gdt_start
-
-
 
 # Modo protegido
 .code32
