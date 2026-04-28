@@ -16,16 +16,13 @@ run: main.img
 # Option 3A: Run QEMU and freeze with GDB on port 1234
 ds: main.img
 	@echo "Starting QEMU. Waiting for GDB connection on port 1234..."
-	qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio
+	qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio -no-reboot
 
 # Option 3B: Launch GDB and connect to QEMU
 dc:
 	@echo "Connecting to QEMU via GDB..."
 	gdb -ex "target remote localhost:1234" \
-	    -ex "break *0x7c00" \
-	    -ex "break *0x7c19" \
-	    -ex "break *0x7c3e" \
-	    -ex "break *0x07c51" \
+	    -ex "break *0x7c51" \
 	    -ex "dashboard -layout breakpoints stack assembly"
 
 # Link the object file into a bootable binary image

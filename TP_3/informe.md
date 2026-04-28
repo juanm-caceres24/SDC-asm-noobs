@@ -596,13 +596,12 @@ Esto tambien podemos verificarlo con GDB inicializando un servidor GDB y conecta
 - Iniciar con qemu: `qemu-system-i386 -fda main.img -boot a -s -S -monitor stdio` (El flag `-s` abre un servidor GDB en puerto 1234)
 - En otra terminal ejecutar gdb: `gdb`
 - Dentro de gdb conectarse al puerto 1234: `target remote localhost:1234`
-- Poner un breakpoints:
-  - `br *0x7c00`
-  - `br *0x7c19` (antes del salto)
-  - `br *0x7c3e` (protected_mode_entry)
-  - `br *0x07c51` (antes del error)
+- Poner un breakpoint: `br *0x07c51` (antes del error)
 - Para una mejor visualizacion realizamos: `dashboard -layout breakpoints stack assembly`
 
+Ejecutando paso a paso obtuvimos el crash:
+
+imagenes
 
 ### Referencias
 
