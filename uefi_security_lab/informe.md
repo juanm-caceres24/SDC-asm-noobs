@@ -87,9 +87,17 @@ El `-b` le dice a la consola que haga una pausa cada vez que se llene la pantall
 > Al ejecutar el comando map y dh, vemos protocolos e identificadores en lugar de puertos de hardware fijos.  
 > ¿Cuál es la ventaja de seguridad y compatibilidad de este modelo frente al antiguo BIOS?
 
-Este modelo reemplaza la comunicación directa y predecible por interfaces lógicas. 
-Esto otorga compatibilidad al independizar el software de la arquitectura física del hardware, 
-y brinda seguridad al obligar a todo el código a someterse a mecanismos de verificación (como Secure Boot) antes de concederle acceso a los recursos del sistema.
+En el BIOS tradicional el software de arranque tenía que hablar directamente con los puertos de hardware físicos o usar interrupciones fijas de la placa madre.
+Si la tecnología cambiaba el código a bajo nivel dejaba de funcionar porque los puertos físicos eran distintos.
+
+Con el modelo UEFI se crea una capa de abstracción. Al gestor de arranque no le importa cómo está cableado el hardware internamente, UEFI se encarga de la traducción.
+Esto hace que el entorno sea completamente modular y a prueba de futuro.
+
+Ademas como BIOS dependía de ubicaciones físicas predecibles y sin restricciones era un blanco perfecto para atacantes. 
+Un malware o bootkit sobrescribía esas direcciones físicas de memoria fijas y tomaba el control del sistema antes de que el antivirus o el propio Windows pudieran arrancar.
+
+Con el modelo UEFI al forzar a que toda interacción pase a través de Protocolos gestionados por el firmware, se elimina el acceso directo y caótico al hardware. 
+Ahora el firmware actúa como un guardia de seguridad. Esta arquitectura basada en interfaces estructuradas es la que hace posible el Secure Boot.
 
 #### Análisis de Variables Globales (NVRAM)
 
@@ -130,6 +138,46 @@ Luego podemos ver a la derecha de cada variable Boot#### un indicio de que repre
 
 > [!IMPORTANT]
 > Screenshot de dmpstore aqui
+
+#### Footprinting de Memoria y Hardware
+
+Con el comando `memmap` podemos observar el Mapa de Memoria de UEFI, esencialmente viendo cómo está distribuida físicamente la memoria RAM en determinado momento.
+
+La UEFI no trata a la RAM como un solo bloque gigante, sino que la divide en secciones y le asigna un "Tipo" y permisos a cada una.
+
+Al ejecutar el comando observamos una tabla con columnas que muestran la dirección de inicio, la dirección de fin y el tipo de memoria.
+
+> [!IMPORTANT]
+> Screenshot de memmap aqui
+
+Con el comando `pci` listamos los dispositivos PCI. El bus PCI  es la "columna vertebral" del hardware de la placa madre. 
+
+Este comando lista todos los componentes físicos conectados a ella (tarjetas de video, controladores de disco SATA/NVMe, placas de red, puertos USB).
+
+> [!IMPORTANT]
+> Screenshot de pci aqui
+
+Aqui vemos una lista organizada por Bus, Dispositivo y Función (B/D/F). Por cada elemento vemos su Vendor ID y su Device ID.
+
+Con el comando `drivers` podemos ver los controladores UEFI.
+
+Así como Windows tiene drivers la UEFI tiene sus propios controladores en formato DXE (Driver Execution Environment) que le enseñan al firmware cómo usar el mouse, cómo leer un disco FAT32 o cómo dibujar gráficos básicos en la pantalla.
+
+Al ejecutar el comando observamos un listado con un número de Handle, la versión del driver, el tipo y el nombre (ej. FAT File System Driver, Qemu Video Driver).
+
+> **Pregunta de Razonamiento:**  
+> En el mapa de memoria (memmap), existen regiones marcadas como RuntimeServicesCode.  
+> ¿Por qué estas áreas son un objetivo principal para los desarrolladores de malware (Bootkits)?
+
+Las regiones marcadas como RuntimeServicesCode son el objetivo principal de los Bootkits porque es la única memoria de la UEFI que sobrevive a la carga del Sistema Operativo.  
+Si un malware logra inyectarse en esta área, seguirá vivo y ejecutándose en la RAM de forma completamente invisible incluso después de que Windows o Linux hayan arrancado.
+
+El sistema operativo necesita hacerle preguntas a la placa madre despues del boot. Para esto, la UEFI carga ciertas funciones en RuntimeServicesCode.
+Cuando la UEFI le entrega el mapa de memoria a Windows, indica la porción de la memoria que es RuntimeServicesCode, y Windows respeta esta seccion y la deja intacta.
+
+Si un desarrollador de malware inyecta su virus dentro de un área de RuntimeServicesCode, el código malicioso cruza la frontera entre el firmware y el sistema operativo sin ser destruido y puede ser ejecutado con privilegios más altos que el propio Kernel de Windows (Ring -2). Desde allí, puede parchear el sistema operativo en tiempo real, robar contraseñas en memoria o desactivar medidas de seguridad del OS.
+
+Los antivirus convencionales escanean los procesos del sistema operativo y los discos duros. Generalmente no tienen permisos ni capacidad para auditar y analizar el código que se ejecuta en las regiones de memoria de los Runtime Services del firmware, haciendo que el malware sea virtualmente indetectable.
 
 ### Desarrollo, compilación y análisis de seguridad
 
