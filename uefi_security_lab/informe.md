@@ -172,7 +172,153 @@ Los antivirus convencionales escanean los procesos del sistema operativo y los d
 
 ### Desarrollo, compilación y análisis de seguridad
 
-...
+#### Desarrollo de Aplicación
+
+**aplicacion.c**
+```C
+#include <efi.h>
+#include <efilib.h>
+
+EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) 
+{
+    InitializeLib(ImageHandle, SystemTable);
+    SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Iniciando analisis de seguridad...\r\n");
+    // Inyección de un software breakpoint (INT3)
+    unsigned char code[] = { 0xCC };
+    if (code[0] == 0xCC) 
+    {
+        SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Breakpoint estatico alcanzado.\r\n");
+    }
+    return EFI_SUCCESS;
+}
+```
+Minima explicación de `aplicacion.c`: 
+
+Este código es una aplicación UEFI, que corre en el entorno de firmware.
+
+Está usando las librerías de GNU-EFI:
+- `efi.h`: define las estructuras base de UEFI (tipos como EFI_STATUS, EFI_HANDLE, EFI_SYSTEM_TABLE).
+- `efilib.h`: funciones auxiliares (como InitializeLib) que simplifican el uso del entorno EFI.
+
+El punto de entrada es `efi_main()`, que es el equivalente al main() en programas normales, pero para UEFI.
+
+¿Qué se está queriendo hacer?
+
+- Muestra un mensaje inicial: *Iniciando analisis de seguridad...*
+- Define un byte con valor `0xCC`.
+- Verifica ese valor e imprime otro mensaje si coincide: *Breakpoint estatico alcanzado.*
+
+> **Pregunta de Razonamiento:**  
+> ¿Por qué utilizamos SystemTable->ConOut->OutputString en lugar de la función printf de C?
+
+Utilizamos `SystemTable->ConOut->OutputString` porque la aplicación se ejecuta en un entorno UEFI, donde no existe un sistema operativo ni la infraestructura de runtime de C.
+La función `printf` pertenece a la librería estándar de C y depende de mecanismos de entrada/salida como `stdout` y `syscalls`, que no están disponibles en este entorno.
+En su lugar, UEFI provee sus propios protocolos de I/O, como `ConOut`, que permiten interactuar directamente con la consola del firmware.
+
+#### Compilación a Formato PE/COFF
+
+Comandos:
+```bash
+# 1. Compilar a código objeto
+gcc -I/usr/include/efi -I/usr/include/efi/x86_64 -I/usr/include/efi/protocol -fpic -ffreestanding
+-fno-stack-protector -fno-strict-aliasing -fshort-wchar -mno-red-zone
+-maccumulate-outgoing-args -Wall -c -o aplicacion.o aplicacion.c
+# 2. Linkear (generar .so intermedio)
+ld -shared -Bsymbolic -L/usr/lib -L/usr/lib/efi -T /usr/lib/elf_x86_64_efi.lds
+/usr/lib/crt0-efi-x86_64.o aplicacion.o -o aplicacion.so -lefi -lgnuefi
+# 3. Convertir a ejecutable EFI (PE/COFF)
+objcopy -j .text -j .sdata -j .data -j .dynamic -j .dynsym -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc
+--target=efi-app-x86_64 aplicacion.so aplicacion.efi
+```
+**Breve descripción de los flags que intervienen:**
+
+**Compilación:**
+
+- Los includes `-I/..` agregan paths de los headers de GNU-EFI
+- `-ffreestanding` indica que no hay OS
+- `-fpic` genera código compatible con firmware (**Position Independent Code**),necesario porque UEFI puede cargar la imagen en distintas direcciones.
+- `-fno-stack-protector` desactiva protección de stack.
+- `-fno-strict-aliasing` evita optimizaciones que pueden romper código de bajo nivel
+- `-fshort-wchar` define el ancho de caracteres en 2 bytes (UTF-16)
+- `mno-red-zone` desactiva la red zone de x86_64
+- `maccumulate-outgoing-args` asegura layout estable de argumentos en stack
+
+**Linkeo:**
+- `-shared` genera un binario tipo shared object (.so)
+- `-Bsymbolic` resuelve símbolos dentro del propio binario, y evita problemas de relocación en firmware
+- `L...` paths donde buscar librerías (libefi, libgnuefi)
+
+- `-T elf_x86_64_efi.lds` linker script, UEFI necesita un layout específico, organiza el binario final en memoria (define secciones compatible con UEFI)
+    > Sin este script, el binario tendría un layout ELF estándar no compatible con UEFI y fallaría al cargarse.
+
+- `/usr/lib/crt0-efi-x86_64.o` runtime inicial (entry point real antes de efi_main)
+    > Es el puente entre el firmware UEFI y el código C.
+
+- `-lefi` Librería base de EFI ( **EFI_STATUS, EFI_HANDLE,  EFI_SYSTEM_TABLE** )
+- `-lgnuefi` Librería de utilidades de GNU-EFI. ( **InitializeLib()** )
+
+**Conversión a formato EFI**
+
+- `objcopy` convierte el binario ELF (.so) a formato PE/COFF (.efi)
+- `-j <sección>` incluye únicamente las secciones especificadas en el binario final
+- `--target=efi-app-x86_64` define el formato de salida como aplicación EFI de 64 bits (PE/COFF)
+
+**Resumen:**
+```text
+C
+↓ (gcc)
+ELF objeto (.o)
+↓ (ld)
+ELF compartido (.so)
+↓ (objcopy)
+PE/COFF (.efi)  ← lo que ejecuta UEFI
+```
+
+#### Análisis de Metadatos y Decompilación
+
+Comandos:
+```bash
+file aplicacion.efi
+readelf -h aplicacion.efi
+ghidra
+```
+
+Al ejecutar `file aplicacion.efi` podemos ver el tipo de archivo:
+
+----------IMG file_aplicacion.efi----------
+
+Al ejecutar `readelf -h aplicacion.efi` vemos que genera un error:
+
+----------IMG readelf----------
+
+Esto se debe a que el comando `readelf -h` intenta leer el header como si `aplicacion.efi` fuese un archivo ELF, por lo tanto el error es correcto, ya que el formato que le desiganmos al archivo en el paso anterior es de `PE/COFF`
+
+Luego de ejecutar `ghidra` necesitamos generar un proyecto e importar el archivo `aplicacion.efi` para poder hacer ingenieria inversa del mismo.
+
+----------IMG import_aplicacion.efi----------
+
+----------IMG ghidra----------
+
+> **Pregunta de Razonamiento:**  
+> En el pseudocódigo de Ghidra, la condición 0xCC suele aparecer como -52. ¿A qué se debe este fenómeno y por qué importa en ciberseguridad?
+
+El valor 0xCC aparece como -52 debido a la interpretación de tipos con signo. En sistemas donde char es signed, 0xCC (204 decimal) se interpreta como -52 al representarse en **complemento a dos**.
+> El complemento a dos es una representación binaria de enteros con signo en la que los números negativos se obtienen invirtiendo los bits del valor positivo y sumando uno.
+
+En ciberseguridad, esta distinción es crítica, ya que herramientas de análisis como decompiladores pueden representar los mismos datos de formas distintas, lo que puede llevar a interpretaciones erróneas del comportamiento del programa. Además, técnicas de evasión utilizadas en malware pueden explotar estas diferencias para ocultar instrucciones o dificultar el análisis.
+
+#### Análisis función *efi_main()*
+
+> [!NOTE]
+> En el panel izquierdo en la seccion `Functions` se pueden filtral las funciones, y buscar `efi_main`.
+
+Aca se puede ver seccion del `efi_main`:
+
+----------IMG seccion_efi_main----------
+
+En este caso, el valor 0xCC no aparece como -52 en el pseudocódigo de Ghidra porque la condición fue optimizada por el compilador al ser constante, eliminando el if. Sin embargo, el valor puede observarse en el código assembly como 0xCC, donde se realiza la comparación correspondiente.
+
+----------IMG 0xcc----------
 
 ### Ejecución en Hardware Físico (Bare Metal)
 
