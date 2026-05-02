@@ -197,7 +197,7 @@ Minima explicación de `aplicacion.c`:
 Este código es una aplicación UEFI, que corre en el entorno de firmware.
 
 Está usando las librerías de GNU-EFI:
-- `efi.h`: define las estructuras base de UEFI (tipos como EFI_STATUS, EFI_HANDLE, EFI_SYSTEM_TABLE).
+- `efi.h`: define las estructuras base de UEFI (como EFI_STATUS, EFI_HANDLE, EFI_SYSTEM_TABLE).
 - `efilib.h`: funciones auxiliares (como InitializeLib) que simplifican el uso del entorno EFI.
 
 El punto de entrada es `efi_main()`, que es el equivalente al main() en programas normales, pero para UEFI.
@@ -285,19 +285,23 @@ ghidra
 
 Al ejecutar `file aplicacion.efi` podemos ver el tipo de archivo:
 
-----------IMG file_aplicacion.efi----------
+<img width="806" height="77" alt="file_aplicacion efi" src="https://github.com/user-attachments/assets/5c0ccdd6-e5ab-4572-9971-ff3375f0a735" />
+
 
 Al ejecutar `readelf -h aplicacion.efi` vemos que genera un error:
 
-----------IMG readelf----------
+<img width="806" height="77" alt="readelf" src="https://github.com/user-attachments/assets/908cb63a-87a8-4f49-a289-0cb93f0538b2" />
+
 
 Esto se debe a que el comando `readelf -h` intenta leer el header como si `aplicacion.efi` fuese un archivo ELF, por lo tanto el error es correcto, ya que el formato que le desiganmos al archivo en el paso anterior es de `PE/COFF`
 
 Luego de ejecutar `ghidra` necesitamos generar un proyecto e importar el archivo `aplicacion.efi` para poder hacer ingenieria inversa del mismo.
 
-----------IMG import_aplicacion.efi----------
+<img width="801" height="605" alt="import_aplicacion efi" src="https://github.com/user-attachments/assets/128bf529-91ea-4184-aa4d-f0d63d9799a4" />
 
-----------IMG ghidra----------
+<img width="1318" height="736" alt="ghidra" src="https://github.com/user-attachments/assets/00667046-fcc8-4a54-b29c-44c7f82a9d29" />
+
+
 
 > **Pregunta de Razonamiento:**  
 > En el pseudocódigo de Ghidra, la condición 0xCC suele aparecer como -52. ¿A qué se debe este fenómeno y por qué importa en ciberseguridad?
@@ -314,11 +318,12 @@ En ciberseguridad, esta distinción es crítica, ya que herramientas de análisi
 
 Aca se puede ver seccion del `efi_main`:
 
-----------IMG seccion_efi_main----------
+<img width="1101" height="585" alt="seccion_efi_main" src="https://github.com/user-attachments/assets/14975567-1097-4b38-adfe-db60040f1fab" />
 
 En este caso, el valor 0xCC no aparece como -52 en el pseudocódigo de Ghidra porque la condición fue optimizada por el compilador al ser constante, eliminando el if. Sin embargo, el valor puede observarse en el código assembly como 0xCC, donde se realiza la comparación correspondiente.
 
-----------IMG 0xcc----------
+<img width="459" height="50" alt="0xcc" src="https://github.com/user-attachments/assets/afda783e-e912-44e8-96fa-b4d568030340" />
+
 
 ### Ejecución en Hardware Físico (Bare Metal)
 
